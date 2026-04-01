@@ -1,0 +1,436 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Pro Se Besties API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: intake
+    description: Case intake operations
+  - name: insights
+    description: Legal insight questions and responses
+  - name: referrals
+    description: Referral directory
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /intake:
+    post:
+      operationId: submitIntake
+      tags: [intake]
+      summary: Submit intake form
+      description: Submit user's workplace issue intake form and receive a case analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeSubmission"
+      responses:
+        "201":
+          description: Intake submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /intake/{id}:
+    get:
+      operationId: getIntakeResult
+      tags: [intake]
+      summary: Get intake result
+      description: Retrieve a previously submitted intake and its analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Intake result retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /insights:
+    get:
+      operationId: listInsights
+      tags: [insights]
+      summary: List legal insight questions and responses
+      description: Returns a list of community legal insight Q&As
+      responses:
+        "200":
+          description: List of insights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InsightItem"
+
+    post:
+      operationId: submitInsightQuestion
+      tags: [insights]
+      summary: Submit a legal insight question
+      description: Submit a question to the legal insights section
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InsightQuestion"
+      responses:
+        "201":
+          description: Question submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InsightItem"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /referrals:
+    get:
+      operationId: listReferrals
+      tags: [referrals]
+      summary: List referral resources
+      description: Returns a list of referral resources by category
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [lawyer, therapist, consultant, community]
+      responses:
+        "200":
+          description: List of referrals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferralItem"
+
+  /insights/featured:
+    get:
+      operationId: getFeaturedInsights
+      tags: [insights]
+      summary: Get featured legal insights
+      description: Returns a curated list of featured insight Q&As for the homepage
+      responses:
+        "200":
+          description: Featured insights
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InsightItem"
+
+  /referrals/categories:
+    get:
+      operationId: getReferralCategories
+      tags: [referrals]
+      summary: Get referral category summary
+      description: Returns a count/summary of referrals by category
+      responses:
+        "200":
+          description: Category summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferralCategorySummary"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    IntakeSubmission:
+      type: object
+      properties:
+        what_happened:
+          type: string
+          description: User's description of the incident
+        issue_type:
+          type: string
+          enum:
+            - discrimination
+            - harassment
+            - retaliation
+            - wrongful_termination
+            - hostile_work_environment
+            - wage_theft
+            - other
+        state:
+          type: string
+          description: US state abbreviation (e.g. CA, TX)
+        zip_code:
+          type: string
+        employer_name:
+          type: string
+        employer_location:
+          type: string
+        incident_date:
+          type: string
+          description: Date the incident occurred (YYYY-MM-DD)
+        last_day_of_employment:
+          type: string
+          nullable: true
+          description: Last day of employment if terminated (YYYY-MM-DD)
+        reported_internally:
+          type: boolean
+          description: Whether the user reported the issue internally
+        has_documentation:
+          type: boolean
+          description: Whether the user has supporting documentation
+        additional_context:
+          type: string
+          nullable: true
+      required:
+        - what_happened
+        - issue_type
+        - state
+        - zip_code
+        - employer_name
+        - employer_location
+        - incident_date
+        - reported_internally
+        - has_documentation
+
+    IntakeResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        submission:
+          $ref: "#/components/schemas/IntakeSubmission"
+        case_summary:
+          type: string
+          description: AI-generated summary of the case (placeholder for now)
+        issue_categories:
+          type: array
+          items:
+            type: string
+          description: Detected legal issue categories
+        next_steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/NextStep"
+          description: Educational next steps
+        attorney_questions:
+          type: array
+          items:
+            type: string
+          description: Questions to prepare when speaking with an attorney
+        relevant_agencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelevantAgency"
+          description: Relevant government agencies or filing bodies
+        created_at:
+          type: string
+      required:
+        - id
+        - submission
+        - case_summary
+        - issue_categories
+        - next_steps
+        - attorney_questions
+        - relevant_agencies
+        - created_at
+
+    NextStep:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [immediate, short_term, long_term]
+        link:
+          type: string
+          nullable: true
+      required:
+        - title
+        - description
+        - priority
+
+    RelevantAgency:
+      type: object
+      properties:
+        name:
+          type: string
+        acronym:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+        filing_deadline_note:
+          type: string
+          nullable: true
+      required:
+        - name
+        - acronym
+        - description
+        - url
+
+    InsightQuestion:
+      type: object
+      properties:
+        question:
+          type: string
+        category:
+          type: string
+          nullable: true
+        submitter_name:
+          type: string
+          nullable: true
+      required:
+        - question
+
+    InsightItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        question:
+          type: string
+        answer:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        contributor_name:
+          type: string
+          nullable: true
+        contributor_title:
+          type: string
+          nullable: true
+        is_featured:
+          type: boolean
+        created_at:
+          type: string
+      required:
+        - id
+        - question
+        - is_featured
+        - created_at
+
+    ReferralItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+          enum: [lawyer, therapist, consultant, community]
+        description:
+          type: string
+        location:
+          type: string
+          nullable: true
+        is_remote:
+          type: boolean
+        website:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        specialties:
+          type: array
+          items:
+            type: string
+        accepts_pro_se:
+          type: boolean
+          nullable: true
+        sliding_scale:
+          type: boolean
+          nullable: true
+        created_at:
+          type: string
+      required:
+        - id
+        - name
+        - category
+        - description
+        - is_remote
+        - specialties
+        - created_at
+
+    ReferralCategorySummary:
+      type: object
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+        description:
+          type: string
+      required:
+        - category
+        - count
+        - description
